@@ -1,152 +1,322 @@
 # HR Document Automation System
 
-**Built from:** Next.js 15 App Router starter template  
-**Starter Template:** https://vercel.com/templates/next.js/nextjs-boilerplate
+AI-powered HR document generation and workflow automation built with Next.js (App Router), TypeScript, Prisma, and the Vercel AI SDK. This project helps HR teams rapidly create job descriptions, offer letters, onboarding emails, policies, interview questions, and more — with a Trello-style task board and database persistence.
 
-AI-powered HR document generation with automated workflows and task management.
+Table of contents
+- Project overview
+- Key features
+- Architecture & code walkthrough
+- Getting started (local)
+- Database and Prisma
+- Environment variables
+- API endpoints (server)
+- Frontend (app) overview
+- AI integration details
+- Email automation (Resend)
+- Deployment
+- Troubleshooting
+- Contributing
+- License
 
-## Features
+---
 
-- **AI Document Generation**: Automatically generate job descriptions, offer letters, onboarding emails, policies, interview questions, and more
-- **Trello-Style Task Board**: Visual kanban board with To Do, In Progress, and Completed columns
-- **Database Persistence**: All tasks and documents saved to Postgres via Prisma
-- **Real-time Updates**: Instant UI updates when tasks are created or documents generated
-- **Priority Management**: Track task priority (low, medium, high)
-- **Document Library**: View and download generated HR documents
+## Project overview
 
-## Tech Stack
+This repo implements a workflow for HR teams to:
+- Create HR tasks (e.g., "Generate offer letter for Senior Engineer")
+- Use AI to generate document content for tasks
+- Move tasks through To Do → In Progress → Completed
+- Persist tasks and generated documents in a Postgres database
+- View, download, and email generated documents
 
-- **Framework**: Next.js 16 with App Router
-- **Starter**: Next.js boilerplate with TypeScript and Tailwind CSS
-- **AI**: Vercel AI SDK with OpenAI GPT-4o-mini
-- **Database**: Neon Postgres with Prisma ORM
-- **UI**: Shadcn/ui components with Tailwind CSS
-- **Deployment**: Vercel
+It is built on modern web tooling to provide a quick developer experience and production-grade deployment.
 
-## Getting Started
+---
 
-### Prerequisites
-- Node.js 18+ installed
-- A Neon Postgres database
-- A Resend account (for email functionality)
-- Vercel account with billing enabled (for AI Gateway)
+## Key features
 
-### Local Development Setup
+- AI Document Generation (GPT via Vercel AI SDK)
+- Trello-style Kanban board for task management (To Do / In Progress / Completed)
+- Postgres persistence via Prisma ORM
+- Document library for generated HR documents
+- Priority tracking (low / medium / high)
+- Email delivery via Resend
+- Real-time-ish UI updates on task changes
+- Fully typed with TypeScript and styled with Tailwind CSS + shadcn/ui components
 
-1. **Clone the repository**:
-   \`\`\`bash
-   git clone <your-repo-url>
-   cd hr-automation
-   \`\`\`
+---
 
-2. **Install dependencies**:
-   \`\`\`bash
-   npm install
-   \`\`\`
+## Architecture & code walkthrough
 
-3. **Set up environment variables**:
-   \`\`\`bash
-   cp .env.example .env.local
-   \`\`\`
-   
-   Add your credentials to `.env.local`:
-   \`\`\`env
-   DATABASE_URL="postgresql://..."      # From Neon dashboard
-   RESEND_API_KEY="re_..."             # From Resend dashboard
-   \`\`\`
+High-level architecture:
+- Frontend: Next.js App Router (React + server components + client components)
+- Backend API routes: Next.js app router API route handlers under /app/api or /src/app/api
+- Database: PostgreSQL (Neon or any managed Postgres) accessed through Prisma client
+- AI: Vercel AI SDK (OpenAI models like GPT-4o-mini)
+- Email: Resend for sending generated documents
 
-4. **Initialize the database**:
-   \`\`\`bash
-   npm run db:init
-   \`\`\`
-   
-   This runs the SQL migration scripts to create the necessary tables.
+Important files & directories (what to look for and why):
+- app/ (Next.js App Router)
+  - app/layout.tsx — Root layout and global providers (theme, auth, etc.)
+  - app/page.tsx — Home page; usually renders the task board
+  - app/(components)/ — App-specific routes and subpages
+- components/
+  - TaskBoard.tsx — Renders the Kanban columns and drag/drop interactions
+  - TaskCard.tsx — UI for a single task (title, priority, action buttons)
+  - DocumentViewer.tsx — Modal/page to view a generated document and download it
+  - CreateTaskForm.tsx — Form for creating new HR tasks
+- lib/
+  - prisma.ts — Exports a single Prisma client instance for server-side use
+  - ai.ts — Wrapper/utility to call the Vercel AI SDK or OpenAI (prompts, system messages)
+  - resend.ts — Wrapper to send emails through Resend API
+- prisma/
+  - schema.prisma — Prisma models for Task, Document, and any other entities
+  - migrations/ — Auto-generated migrations (after running `prisma migrate`)
+- scripts/
+  - db-init or similar — SQL or Node scripts to seed or initialize DB tables (called by `npm run db:init`)
+- app/api/
+  - api/tasks/route.ts (or route handlers in app/api/tasks/...) — Handlers for CRUD operations and `generate` actions
+  - api/tasks/[id]/route.ts — Update/delete single task
+  - api/tasks/[id]/generate/route.ts — Triggers AI generation for a task
+- package.json — Scripts and dependency list
+- README.md — This file
 
-5. **Start the development server**:
-   \`\`\`bash
-   npm run dev
-   \`\`\`
+Data model summary (typical)
+- Task
+  - id (uuid)
+  - title
+  - description
+  - type (e.g., job_description, offer_letter)
+  - status (todo, in_progress, completed)
+  - priority (low, medium, high)
+  - createdAt, updatedAt
+- Document
+  - id
+  - taskId (relation)
+  - title
+  - content (text or markdown)
+  - createdAt
 
-6. **Open the app**: Navigate to [http://localhost:3000](http://localhost:3000)
+---
 
-For detailed setup instructions, troubleshooting, and configuration options, see [LOCAL_SETUP.md](./LOCAL_SETUP.md).
+## How the code works (end-to-end flow)
 
-## How It Works
+1. User creates a Task via CreateTaskForm.
+2. The frontend posts to `POST /api/tasks` to insert a Task into Postgres via Prisma.
+3. User clicks "Generate" on a task. Frontend requests `POST /api/tasks/[id]/generate`.
+4. Server API route (route.ts) marks the task status as `in_progress`, then calls the AI wrapper (lib/ai.ts).
+5. AI returns generated content, which the route stores as a Document record (linked to Task).
+6. The Task status is updated to `completed`. The frontend refreshes the task or receives updated data and shows the generated document.
+7. The document can be downloaded or optionally emailed via Resend (lib/resend.ts).
 
-1. **Create a Task**: Click "Create New HR Task" and select the document type
-2. **AI Generation**: Click "Generate" on any To Do task
-3. **Automatic Processing**: The task moves to "In Progress" while AI generates the document
-4. **Completion**: Once done, the task moves to "Completed" with the generated document
-5. **View Documents**: Click on any document to view the full content
+Key code responsibilities:
+- lib/prisma.ts: ensure a single Prisma client instance (avoid client duplication in dev/hot reload).
+- lib/ai.ts: formats prompts and calls the Vercel AI SDK / OpenAI and returns structured text.
+- app/api/...: implement business logic (status transitions, saving documents, validating input).
+- components/*: UI and UX (drag/drop, forms, modals). Client components that call API routes.
 
-## Document Types
+---
 
-- Job Descriptions
-- Offer Letters
-- Onboarding Emails
-- Company Policies
-- Interview Questions
-- Performance Reviews
-- Termination Letters
+## Getting started (local)
 
-## Database Schema
+Prerequisites
+- Node.js 18+ (as required by Next.js)
+- pnpm or npm/yarn
+- A PostgreSQL database (Neon, Supabase, or local Postgres)
+- Resend account (optional — only for email)
+- Vercel account & billing enabled for AI Gateway if using Vercel AI SDK
 
-**Tasks Table**:
-- id, title, description, type, status, priority, timestamps
+Clone and install
+```bash
+git clone https://github.com/Kush614/HR-worflow-Automation-using-AI.git
+cd HR-worflow-Automation-using-AI
+npm install
+```
 
-**Documents Table**:
-- id, taskId, title, content, type, timestamp
+Environment
+```bash
+cp .env.example .env.local
+# Edit .env.local and add credentials
+```
 
-## API Endpoints
+Recommended .env variables (example)
+- DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
+- RESEND_API_KEY="re_..."
+- NEXTAUTH_SECRET="a-random-secret" (if using auth)
+- VERCEL_AI_KEY="..." or OPENAI_API_KEY depending on your integration
+- NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
-- `GET /api/tasks` - Fetch all tasks
-- `POST /api/tasks` - Create new task
-- `PATCH /api/tasks/[id]` - Update task status
-- `DELETE /api/tasks/[id]` - Delete task
-- `POST /api/tasks/[id]/generate` - Generate document for task
+Initialize DB & Prisma
+```bash
+# If the repo defines a script
+npm run db:init
 
-## Environment Variables
+# Or use Prisma directly:
+npx prisma migrate dev --name init
+npx prisma db seed    # if a seed script exists
+```
 
-Required environment variables:
+Run dev server
+```bash
+npm run dev
+# Open http://localhost:3000
+```
 
-- `DATABASE_URL` - Your Neon Postgres connection string
-- `RESEND_API_KEY` - Your Resend API key for sending emails
+---
 
-See `.env.example` for the complete list.
+## Database & Prisma notes
 
-## Available Scripts
+- The primary schema is in prisma/schema.prisma. Look for Task and Document models.
+- To update models:
+  1. Edit prisma/schema.prisma
+  2. Run `npx prisma migrate dev --name your-change`
+  3. Update TypeScript types with `npx prisma generate` (usually automatic via migrate)
+- Use a single Prisma client instance: lib/prisma.ts should export `prisma` and reuse it.
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production  
-- `npm run start` - Start production server
-- `npm run db:init` - Initialize database tables
-- `npm run lint` - Run ESLint
+Common prisma.ts pattern:
+```ts
+import { PrismaClient } from '@prisma/client'
+const globalAny: any = global
+
+export const prisma =
+  globalAny.prisma ||
+  new PrismaClient({ log: ['query'] })
+
+if (process.env.NODE_ENV !== 'production') globalAny.prisma = prisma
+```
+
+---
+
+## API endpoints (typical)
+
+- GET /api/tasks — fetch tasks (query params: status, priority, type)
+- POST /api/tasks — create a new task (body: title, description, type, priority)
+- PATCH /api/tasks/[id] — update basic fields or status
+- DELETE /api/tasks/[id] — delete a task and optionally cleanup documents
+- POST /api/tasks/[id]/generate — trigger AI to generate a document for this task
+- POST /api/documents/[id]/email — send document via email (uses Resend wrapper)
+
+Example POST /api/tasks (request body):
+```json
+{
+  "title": "Offer letter for Senior Engineer",
+  "description": "Offer letter for full-time Senior Backend Engineer, 100k/yr",
+  "type": "offer_letter",
+  "priority": "high"
+}
+```
+
+Server handlers should:
+- Validate permissions (if auth exists)
+- Validate input shapes
+- Safely update DB using Prisma transactions where multiple writes are involved (e.g., creating document and updating task status)
+
+---
+
+## AI integration details
+
+Where to look:
+- lib/ai.ts — responsible for constructing prompts (system + user) and calling the AI model
+- API route that calls lib/ai.ts — marks task `in_progress`, calls AI, persists output, updates status
+
+Prompt design suggestions:
+- Provide structured system messages: role, tone, examples
+- Provide explicit instructions to return outputs in markdown or JSON when you want structured parts (e.g., sections, bullet lists)
+- Limit response length if needed
+
+Handling long responses:
+- Store document content in a `text` or `mediumtext` column (DB). If very long, consider storing in object storage and saving a URL in DB.
+
+Security and billing:
+- Ensure your AI key is kept in server environment variables (never expose to browser).
+- If using the Vercel AI Gateway, ensure Vercel billing is active and quota is managed.
+
+---
+
+## Email automation (Resend)
+
+- lib/resend.ts wraps Resend API calls to send generated documents as email attachments or inline content.
+- Typical flow: POST /api/documents/[id]/email with recipient and optional subject/body, the route fetches the document content and calls Resend.
+
+Resend notes:
+- Use `RESEND_API_KEY` server-side
+- Test using a test address (Resend allows test emails)
+- Consider storing email logs in DB for auditing
+
+---
+
+## Deployment
+
+Deploy to Vercel (recommended)
+- Set required environment variables in the Vercel project settings (DATABASE_URL, RESEND_API_KEY, NEXTAUTH_SECRET, VERCEL_AI_KEY or OPENAI key)
+- Ensure Prisma migrations are run (Vercel can run `npx prisma migrate deploy` during build or via a one-off job)
+- If using Vercel AI Gateway, enable billing & AI integration in Vercel
+- Set the production branch (main) and push
+
+Alternate deployments:
+- Any provider supporting Node.js and Postgres. Make sure to run `prisma migrate deploy` on deploy and set env vars.
+
+---
 
 ## Troubleshooting
 
-**Database connection issues?**
-- Verify your `DATABASE_URL` is correct in `.env.local`
-- Run `npm run db:init` to ensure tables exist
+Database connection issues
+- Verify `DATABASE_URL` format and credentials
+- Check that migrations were applied: `npx prisma migrate status`
 
-**AI generation not working?**
-- Ensure you have billing enabled on your Vercel account
-- Minimum $5 credit required for AI Gateway
+AI generation failing
+- Ensure server-side AI key is set and valid
+- Check logs for rate-limiting or billing issues on Vercel/OpenAI
 
-**Email not sending?**
-- Verify your `RESEND_API_KEY` in `.env.local`
-- Use `delivered@resend.dev` for testing (visible in Resend dashboard)
+Email not sending
+- Verify `RESEND_API_KEY` and check Resend logs for rejections
 
-For more detailed troubleshooting, see [LOCAL_SETUP.md](./LOCAL_SETUP.md).
+Prisma client errors in development
+- Ensure `lib/prisma.ts` uses a global cached Prisma client for HMR
 
-## Project Development
+---
 
-This project started from the [Next.js App Router starter template](https://vercel.com/templates/next.js/nextjs-boilerplate) and added:
-- Neon Postgres database integration with SQL queries
-- Vercel AI SDK for document generation
-- Resend email service for automated delivery
-- Custom HR workflow automation features
-- Trello-style task board UI
+## Contributing
 
+it took around 2 to 3 hours for the project
 
+---
 
+## Tests & Quality
 
+- Lint: `npm run lint` (ESLint / TypeScript)
+- Add unit tests for business logic (AI prompt builders, DB helpers) using your preferred test framework
+- Consider integration tests for API routes using a test DB (SQLite or test Postgres instance)
+
+---
+
+## FAQ
+
+Q: Can I use another AI provider?
+A: Yes. Replace lib/ai.ts implementation with a client for your provider and keep the same function signatures used by API routes.
+
+Q: How to add new document types?
+A: Add the type to front-end UI dropdown, update the prompt builder in lib/ai.ts to handle the new type, and update any validation in server routes.
+
+Q: Is there authentication?
+A: If your repo includes auth (NextAuth or similar), configure `NEXTAUTH_SECRET` and identity providers. If not, consider adding access control for production usage.
+
+---
+
+## Appendix — Example prompt (in lib/ai.ts)
+
+System message:
+"You are an HR assistant. Produce a professional offer letter for the provided role. Include sections: greeting, role summary, compensation, start date, at-will statement, next steps. Return the response in markdown."
+
+User message:
+"Role: Senior Backend Engineer
+Salary: $100,000/year
+Location: Remote
+Start Date: 2026-01-15
+Notes: Include relocation assistance clause if remote is not possible."
+
+---
+
+## License
+
+Specify your license here (e.g., MIT). If you want to apply a license, add a LICENSE file.
