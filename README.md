@@ -149,12 +149,4 @@ This project started from the [Next.js App Router starter template](https://verc
 
 Git commits show the incremental development from starter to full-featured application.
 
-## Perfect for Robosource Assessment
 
-This project demonstrates:
-- AI workflow automation
-- Multi-step process handling
-- Database integration with Prisma
-- Real-time UI updates
-- Clean, production-ready code
-- Git commit history showing incremental progress
