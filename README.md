@@ -147,6 +147,6 @@ This project started from the [Next.js App Router starter template](https://verc
 - Custom HR workflow automation features
 - Trello-style task board UI
 
-Git commits show the incremental development from starter to full-featured application.
+
 
 
