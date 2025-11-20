@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  type        String   // JD, offer_letter, onboarding_email, policy, interview_questions, etc.
+  status      String   @default("todo") // todo, in_progress, completed
+  priority    String   @default("medium") // low, medium, high
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  documents   Document[]
+  
+  @@index([status])
+  @@index([type])
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title     String
+  content   String   @db.Text
+  type      String   // job_description, offer_letter, email, policy, etc.
+  createdAt DateTime @default(now())
+  
+  @@index([taskId])
+}
