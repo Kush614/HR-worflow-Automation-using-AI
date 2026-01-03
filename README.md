@@ -1,5 +1,7 @@
 # HR Document Automation System
 
+Project Demo : https://www.linkedin.com/posts/kush-ise_hr-ai-nextjs-activity-7405343194097410048-ZCgD?utm_source=share&utm_medium=member_desktop&rcm=ACoAAC3fbtQB4rrQT2lG73WgXxHRVxTzBV2xwWk
+
 AI-powered HR document generation and workflow automation built with Next.js (App Router), TypeScript, Prisma, and the Vercel AI SDK. This project helps HR teams rapidly create job descriptions, offer letters, onboarding emails, policies, interview questions, and more — with a Trello-style task board and database persistence.
 
 Table of contents
